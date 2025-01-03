@@ -5,7 +5,6 @@ import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
 const PackageCreation: React.FC = () => {
   const navigate = useNavigate();
 
-  // State for form fields and errors
   const [formData, setFormData] = useState({
     packageName: '',
     price: '',
@@ -18,14 +17,14 @@ const PackageCreation: React.FC = () => {
     description: '',
   });
 
-  // Function to handle input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
     setErrors({ ...errors, [name]: '' }); // Clear error when user types
   };
 
-  // Function to validate form fields
   const validate = () => {
     const newErrors = {
       packageName: '',
@@ -53,17 +52,38 @@ const PackageCreation: React.FC = () => {
     return isValid;
   };
 
-  // Function to handle "Next" button click
-  const handleNextClick = () => {
+  const handleNextClick = async () => {
     if (validate()) {
-      navigate('/course_mapping'); // Navigate to the CourseMapping page
-    }
-  };
+      try {
+        const response = await fetch('http://localhost:5000/create-package', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData), // Convert form data to JSON
+        });
+
+        if (response.ok) {
+          const responseData = await response.json();
+          console.log('Package created successfully:', responseData);
+          const packageId = responseData.package_id;
+          navigate(`/course_mapping/${packageId}`);
+                  } else {
+          const errorData = await response.json();
+          console.error('Error creating package:', errorData.message);
+          alert(`Failed to create package: ${errorData.message}`);
+          }
+        } catch (error) {
+        console.error('Network error:', error);
+        alert('Failed to create package. Please try again later.');
+        }
+       }
+      };
 
   return (
     <>
       <Breadcrumb pageName="Package" />
-
+      
       <div className="grid grid-cols-1 gap-9 sm:grid-cols-1">
         <div className="flex flex-col gap-1">
           <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">

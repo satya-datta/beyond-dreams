@@ -168,8 +168,9 @@ const App = () => {
             </>
           }
         />
+
           <Route
-          path="/course_mapping"
+          path="/course_mapping/:package_id"
           element={
             <>
               <PageTitle title="Basic Chart | TailAdmin - Tailwind CSS Admin Dashboard Template" />

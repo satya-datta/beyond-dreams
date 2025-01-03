@@ -1,63 +1,76 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
-import { Package } from '../../types/package';
+
+interface Course {
+  id: string;
+  name: string;
+  created_at: string;
+  instructor: string;
+}
 
 const COURSEMAPPING: React.FC = () => {
+  const { packageId } = useParams<{ packageId: string }>(); // Retrieve packageId from URL
   const navigate = useNavigate();
 
-  // State for selected courses
+  const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
 
-  const packageData: Package[] = [
-    {
-      name: 'Affiliate Marketing',
-      created_time: 0.0,
-      invoiceDate: 'Jan 13,2023',
-      status: 'Paid',
-    },
-    {
-      name: 'Standard Package',
-      created_time: 59.0,
-      invoiceDate: 'Jan 13,2023',
-      status: 'Paid',
-    },
-    {
-      name: 'Business Package',
-      created_time: 99.0,
-      invoiceDate: 'Jan 13,2023',
-      status: 'Unpaid',
-    },
-    {
-      name: 'Standard Package',
-      created_time: 59.0,
-      invoiceDate: 'Jan 13,2023',
-      status: 'Pending',
-    },
-  ];
+  // Fetch courses from the backend
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/getallcourses`);
+        if (response.ok) {
+          const data = await response.json();
+          setCourses(data); // Assuming the response contains an array of courses
+        } else {
+          console.error('Failed to fetch courses');
+        }
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+      }
+    };
 
-  const handleAddRemove = (courseName: string) => {
+    fetchCourses();
+  }, []);
+
+  const handleAddRemove = (courseId: string) => {
     setSelectedCourses((prevSelected) =>
-      prevSelected.includes(courseName)
-        ? prevSelected.filter((name) => name !== courseName)
-        : [...prevSelected, courseName]
+      prevSelected.includes(courseId)
+        ? prevSelected.filter((id) => id !== courseId)
+        : [...prevSelected, courseId]
     );
   };
 
-  const handleSubmit = () => {
-    const packageId = '12345'; // Replace with the actual package ID
+  const handleSubmit = async () => {
     const mappedData = {
       packageId,
       courses: selectedCourses,
     };
 
-    // Store the mapped data in localStorage
-    localStorage.setItem('courseMapping', JSON.stringify(mappedData));
-    console.log('Mapped Courses:', mappedData);
+    try {
+      const response = await fetch('http://localhost:5000/course-mapping', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(mappedData),
+      });
 
-    // Navigate or perform additional actions if needed
-    alert('Courses successfully mapped to the package!');
-    navigate('/some-next-route'); // Adjust the route as required
+      if (response.ok) {
+        console.log('Courses successfully mapped:', mappedData);
+        alert('Courses successfully mapped to the package!');
+        navigate('/some-next-route'); // Adjust the route as required
+      } else {
+        const error = await response.json();
+        console.error('Failed to map courses:', error.message);
+        alert(`Failed to map courses: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error submitting course mapping:', error);
+      alert('Failed to submit course mapping. Please try again.');
+    }
   };
 
   return (
@@ -73,7 +86,7 @@ const COURSEMAPPING: React.FC = () => {
                   Course Name
                 </th>
                 <th className="min-w-[150px] py-4 px-4 font-medium text-black dark:text-white">
-                  Created at
+                  Created At
                 </th>
                 <th className="min-w-[120px] py-4 px-4 font-medium text-black dark:text-white">
                   Instructor
@@ -84,42 +97,33 @@ const COURSEMAPPING: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {packageData.map((packageItem, key) => (
-                <tr key={key}>
+              {courses.map((course) => (
+                <tr key={course.id}>
                   <td className="border-b border-[#eee] py-5 px-4 pl-9 dark:border-strokedark xl:pl-11">
                     <h5 className="font-medium text-black dark:text-white">
-                      {packageItem.name}
+                      {course.name}
                     </h5>
-                    <p className="text-sm">${packageItem.created_time}</p>
                   </td>
                   <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                     <p className="text-black dark:text-white">
-                      {packageItem.invoiceDate}
+                      {course.created_at}
                     </p>
                   </td>
                   <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
-                    <p
-                      className={`inline-flex rounded-full bg-opacity-10 py-1 px-3 text-sm font-medium ${
-                        packageItem.status === 'Paid'
-                          ? 'bg-success text-success'
-                          : packageItem.status === 'Unpaid'
-                          ? 'bg-danger text-danger'
-                          : 'bg-warning text-warning'
-                      }`}
-                    >
-                      {packageItem.status}
+                    <p className="text-black dark:text-white">
+                      {course.instructor}
                     </p>
                   </td>
                   <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                     <button
                       className={`rounded px-4 py-2 font-medium ${
-                        selectedCourses.includes(packageItem.name)
+                        selectedCourses.includes(course.id)
                           ? 'bg-red-500 text-white'
                           : 'bg-green-500 text-white'
                       }`}
-                      onClick={() => handleAddRemove(packageItem.name)}
+                      onClick={() => handleAddRemove(course.id)}
                     >
-                      {selectedCourses.includes(packageItem.name)
+                      {selectedCourses.includes(course.id)
                         ? 'Remove'
                         : 'Add'}
                     </button>
