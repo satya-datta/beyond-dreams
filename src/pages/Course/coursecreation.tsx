@@ -6,6 +6,7 @@ const CourseCreation: React.FC = () => {
   const [course_name, setcourse_name] = useState('');
   const [instructor, setinstructor] = useState('');
   const [course_description, setcourse_description] = useState('');
+  const [course_image, setCourseImage] = useState<File | null>(null);
 
   // State for dynamically added topics
   const [topics, setTopics] = useState<{ topicName: string; videoUrl: string }[]>([]);
@@ -15,6 +16,7 @@ const CourseCreation: React.FC = () => {
     course_name?: string;
     instructor?: string;
     course_description?: string;
+    course_image?: string;
     topics?: string[];
   }>({});
 
@@ -43,12 +45,20 @@ const CourseCreation: React.FC = () => {
     setTopics(updatedTopics);
   };
 
+  // Handle image file selection
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setCourseImage(event.target.files[0]);
+    }
+  };
+
   // Validate form data
   const validateForm = () => {
     const newErrors: typeof errors = {};
     if (!course_name.trim()) newErrors.course_name = 'Course name is required.';
     if (!instructor.trim()) newErrors.instructor = 'Instructor name is required.';
     if (!course_description.trim()) newErrors.course_description = 'Course description is required.';
+    if (!course_image) newErrors.course_image = 'Course image is required.';
     if (topics.some(topic => !topic.topicName.trim() || !topic.videoUrl.trim())) {
       newErrors.topics = topics.map((topic, index) => {
         if (!topic.topicName.trim() || !topic.videoUrl.trim()) {
@@ -61,6 +71,14 @@ const CourseCreation: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Handle form submission
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+    
   // Helper to format date
   const formatDateTime = (date: Date) => {
     const yyyy = date.getFullYear();
@@ -72,37 +90,29 @@ const CourseCreation: React.FC = () => {
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
   };
 
-  // Handle form submission
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-  
-    if (!validateForm()) {
-      return;
-    }
-  
-    const courseData = {
-      course_name,
-      instructor,
-      course_description,
-      created_time: formatDateTime(new Date()), 
-    };
-  
+ 
+
+    const formData = new FormData();
+    formData.append('course_name', course_name);
+    formData.append('instructor', instructor);
+    formData.append('course_description', course_description);
+    formData.append('course_image', course_image as File); // Ensure course_image is not null
+    formData.append('created_time',formatDateTime(new Date())); // Append created_time
+    
+
     try {
-      // Send course details to /create-course
+      // Send course details with image to /create-course
       const courseResponse = await fetch('http://localhost:5000/create-course', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(courseData),
+        body: formData,
       });
-  
+
       if (courseResponse.ok) {
         const courseResult = await courseResponse.json();
         console.log('Course created successfully:', courseResult);
-  
+
         const course_id = courseResult.course_id; // Assuming the response includes the created course ID
-  
+
         // Send each topic to /create-topic
         for (const topic of topics) {
           const topicData = {
@@ -110,7 +120,7 @@ const CourseCreation: React.FC = () => {
             video_url: topic.videoUrl,
             course_id, // Associate each topic with the created course
           };
-  
+
           const topicResponse = await fetch('http://localhost:5000/create-topic', {
             method: 'POST',
             headers: {
@@ -118,19 +128,20 @@ const CourseCreation: React.FC = () => {
             },
             body: JSON.stringify(topicData),
           });
-  
+
           if (!topicResponse.ok) {
             console.error('Error submitting topic:', topicData);
             continue;
           }
-  
+
           console.log('Topic created successfully:', await topicResponse.json());
         }
-  
+
         // Reset the form or show a success message
         setcourse_name('');
         setinstructor('');
         setcourse_description('');
+        setCourseImage(null);
         setTopics([]);
         setErrors({});
         alert('Course and topics created successfully!');
@@ -141,7 +152,6 @@ const CourseCreation: React.FC = () => {
       console.error('Error:', error);
     }
   };
-  
 
 
   return (
@@ -154,7 +164,7 @@ const CourseCreation: React.FC = () => {
             <div className="border-b border-stroke py-4 px-6.5 dark:border-strokedark">
               <h3 className="font-medium text-black dark:text-white">Course</h3>
             </div>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} encType="multipart/form-data">
               <div className="p-7.5">
                 {/* Course Name Input */}
                 <div className="mb-4.5">
@@ -201,7 +211,19 @@ const CourseCreation: React.FC = () => {
                   ></textarea>
                   {errors.course_description && <p className="text-red-500 text-sm">{errors.course_description}</p>}
                 </div>
-
+                <div className="mb-4.5">
+                  <label className="mb-2.5 block text-black dark:text-white">
+                    Course Image <span className="text-meta-1">*</span>
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full rounded border-[1.5px] border-stroke bg-transparent py-3 px-5 text-black outline-none transition focus:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white"
+                    required
+                  />
+                  {errors.course_image && <p className="text-red-500 text-sm">{errors.course_image}</p>}
+                </div>
                 {/* Dynamic Topics Section */}
                 <div className="mb-6">
                   <label className="mb-2.5 block text-black dark:text-white">

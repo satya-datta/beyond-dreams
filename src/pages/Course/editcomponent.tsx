@@ -121,16 +121,14 @@ const EditCourse: React.FC = () => {
         },
         body: JSON.stringify(courseData),
       });
-      console.log(JSON.stringify(courseData));
-
+  
       if (!courseResponse.ok) {
         console.error('Error updating course');
         return;
       }
   
       // Handle new topics: create them
-      for (let i = 0; i < newTopics.length; i++) {
-        const topic = newTopics[i];
+      for (const topic of newTopics) {
         const topicResponse = await fetch('http://localhost:5000/create-topic', {
           method: 'POST',
           headers: {
@@ -145,8 +143,7 @@ const EditCourse: React.FC = () => {
       }
   
       // Handle deleted topics: delete them
-      for (let i = 0; i < deletedTopics.length; i++) {
-        const topicId = deletedTopics[i];
+      for (const topicId of deletedTopics) {
         const deleteResponse = await fetch(`http://localhost:5000/delete-topic/${topicId}`, {
           method: 'DELETE',
         });
@@ -155,10 +152,8 @@ const EditCourse: React.FC = () => {
           console.error('Error deleting topic');
         }
       }
-      alert('Course and topics updated successfully');
-      console.log('Course and topics updated successfully');
   
-      // Fetch updated course details and topics
+      // Fetch the updated course details and topics from the database
       const updatedCourseResponse = await fetch(`http://localhost:5000/getspecific_course/${course_id}`);
       const updatedCourseData = await updatedCourseResponse.json();
       setCourseName(updatedCourseData.course.name);
@@ -174,10 +169,14 @@ const EditCourse: React.FC = () => {
       }));
       setTopics(updatedTopics);
   
-      // Clear localStorage once the operation is complete
+      // Reset local state
+      setNewTopics([]);
+      setDeletedTopics([]);
       localStorage.removeItem('newTopics');
       localStorage.removeItem('deletedTopics');
   
+      alert('Course and topics updated successfully');
+      console.log('Course and topics updated successfully');
     } catch (error) {
       console.error('Error:', error);
     }

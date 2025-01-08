@@ -38,4 +38,42 @@ SELECT c.course_id, c.course_name
 FROM PackageCourseMapping pcm
 JOIN Courses c ON pcm.course_id = c.course_id
 WHERE pcm.package_id = 1;
---retrieving the courses mapped to courses 
+--retrieving the courses mapped to packages 
+
+-- User Table
+CREATE TABLE Users (
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255),
+    email VARCHAR(255),
+    referral_code VARCHAR(50),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Wallet Table
+CREATE TABLE Wallet (
+    wallet_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT,
+    balance DECIMAL(10, 2) DEFAULT 0,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES User(userId)
+);
+
+-- Transaction Table
+CREATE TABLE WalletTransactions (
+    transaction_id INT PRIMARY KEY AUTO_INCREMENT,
+    wallet_id INT,
+    amount DECIMAL(10, 2),
+    transaction_type ENUM('credit', 'debit'),
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (wallet_id) REFERENCES Wallet(wallet_id)
+);
+////
+CREATE TABLE WithdrawalRequest (
+    withdrawal_id INT PRIMARY KEY AUTO_INCREMENT, -- Primary key for the table
+    UserID INT NOT NULL,                          -- Foreign key referencing the user
+    Amount DECIMAL(10, 2) NOT NULL,               -- Withdrawal amount
+    Status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending', -- Status of the request
+    Date DATETIME DEFAULT CURRENT_TIMESTAMP,      -- Request creation date and time
+    FOREIGN KEY (UserID) REFERENCES Users(user_id) -- Foreign key constraint
+);

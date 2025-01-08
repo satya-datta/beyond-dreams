@@ -23,7 +23,12 @@ const COURSEMAPPING: React.FC = () => {
         const response = await fetch(`http://localhost:5000/getallcourses`);
         if (response.ok) {
           const data = await response.json();
-          setCourses(data); // Assuming the response contains an array of courses
+          console.log(data); // Log the response to check the structure
+          if (data.courses && Array.isArray(data.courses)) {
+            setCourses(data.courses); // Extract the courses array from the response
+          } else {
+            console.error('No courses array found in the response');
+          }
         } else {
           console.error('Failed to fetch courses');
         }
@@ -31,6 +36,7 @@ const COURSEMAPPING: React.FC = () => {
         console.error('Error fetching courses:', error);
       }
     };
+    
 
     fetchCourses();
   }, []);

@@ -2,6 +2,7 @@ const express = require('express');
 var connection=require("./backend");
 const adminRouter=require("./routers/adminrouter");
 const PackageRouter=require("./routers/packagerouter");
+const Userrouter=require("./routers/userrouter");
 const port =  5000;
 const app = express();
 const cors = require('cors');
@@ -16,6 +17,7 @@ app.use(cors({
 app.use(express.json());
  app.use('/', adminRouter);
  app.use('/',PackageRouter);
+ app.use('/',Userrouter);
 
 
 app.listen(port,'0.0.0.0', () => {

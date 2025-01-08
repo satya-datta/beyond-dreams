@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Breadcrumb from '../../components/Breadcrumbs/Breadcrumb';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Breadcrumb from "../../components/Breadcrumbs/Breadcrumb";
 
 const ManageCourse: React.FC = () => {
   const navigate = useNavigate();
@@ -12,24 +12,49 @@ const ManageCourse: React.FC = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await fetch('http://localhost:5000/getallcourses');
+        const response = await fetch("http://localhost:5000/getallcourses");
         const data = await response.json();
         if (response.ok) {
           setCourses(data.courses); // Store the fetched courses in state
         } else {
-          console.error('Failed to fetch courses:', data.message);
+          console.error("Failed to fetch courses:", data.message);
         }
       } catch (error) {
-        console.error('Error fetching courses:', error);
+        console.error("Error fetching courses:", error);
       }
     };
 
     fetchCourses();
-  }, []); // Empty dependency array means this runs once on component mount
+  }, []);
 
   const handleEdit = (courseId: string) => {
     // Navigate to the EditCourse page with the course id as parameter
     navigate(`/edit-course/${courseId}`);
+  };
+
+  const handleDelete = async (courseId: string) => {
+    const confirmation = window.confirm(
+      "Are you sure you want to delete this course?"
+    );
+    if (!confirmation) return;
+
+    try {
+      const response = await fetch(`http://localhost:5000/delete-course/${courseId}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (response.ok) {
+        // Filter out the deleted course from the state
+        setCourses((prevCourses) =>
+          prevCourses.filter((course) => course.course_id !== courseId)
+        );
+        alert("Course deleted successfully.");
+      } else {
+        console.error("Failed to delete course:", data.message);
+      }
+    } catch (error) {
+      console.error("Error deleting course:", error);
+    }
   };
 
   return (
@@ -62,7 +87,7 @@ const ManageCourse: React.FC = () => {
                     <h5 className="font-medium text-black dark:text-white">
                       {course.course_name}
                     </h5>
-                                   </td>
+                  </td>
                   <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                     <p className="text-black dark:text-white">
                       {course.created_time}
@@ -75,13 +100,27 @@ const ManageCourse: React.FC = () => {
                   </td>
                   <td className="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                     <div className="flex items-center space-x-3.5">
-                      <button className="hover:text-primary" onClick={() => handleEdit(course.course_id)  }>
-                        
-                        <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="15" height="15" viewBox="0 0 48 48">
+                      <button
+                        className="hover:text-primary"
+                        onClick={() => handleEdit(course.course_id)}
+                      >
+                        {/* Edit Icon */}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          x="0px"
+                          y="0px"
+                          width="15"
+                          height="15"
+                          viewBox="0 0 48 48"
+                        >
                           <path d="M38.657 18.536l2.44-2.44c2.534-2.534 2.534-6.658 0-9.193-1.227-1.226-2.858-1.9-4.597-1.9s-3.371.675-4.597 1.901l-2.439 2.439L38.657 18.536zM27.343 11.464L9.274 29.533c-.385.385-.678.86-.848 1.375L5.076 41.029c-.179.538-.038 1.131.363 1.532C5.726 42.847 6.108 43 6.5 43c.158 0 .317-.025.472-.076l10.118-3.351c.517-.17.993-.463 1.378-.849l18.068-18.068L27.343 11.464z"></path>
                         </svg>
                       </button>
-                      <button className="hover:text-primary">
+                      <button
+                        className="hover:text-primary"
+                        onClick={() => handleDelete(course.course_id)}
+                      >
+                        {/* Delete Icon */}
                         <svg
                           className="fill-current"
                           width="18"

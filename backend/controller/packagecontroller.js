@@ -1,211 +1,263 @@
 const connection = require("../backend");
 
+// controller/packageController.js
+const path = require('path');
+
+
+// Create Package with image upload
 exports.createPackage = (req, res, next) => {
   const { packageName, price, description } = req.body;
+  const imageFile = req.file;  // This contains the uploaded file information
 
   // Validation checks
-  if (!packageName || !price || !description) {
-    return res.status(400).json({ message: "All fields are required." });
+  if (!packageName || !price || !description || !imageFile) {
+    return res.status(400).json({ message: "All fields, including the image, are required." });
   }
 
-  // Insert query for the package table with created_time
+  // Store image path in the database
+  const imagePath = `/uploads/${imageFile.filename}`; // Path to the image file
+
+  // Insert query for the package table including image
   const query = `
-    INSERT INTO packages(package_name, package_price, description, created_time) 
-    VALUES (?, ?, ?, NOW())
+    INSERT INTO packages (package_name, package_price, description, image_path, created_time)
+    VALUES (?, ?, ?, ?, NOW())
   `;
 
-  // Execute the query
+  // Execute query
   connection.query(
     query,
-    [packageName, price, description],
+    [packageName, price, description, imagePath],  // Include the image path
     (err, result) => {
       if (err) {
         console.error("Error creating package:", err);
-        return res.status(500).json({
-          message: "An error occurred while creating the package.",
-          error: err,
-        });
+        return res.status(500).json({ message: "An error occurred while creating the package.", error: err });
       }
 
       res.status(201).json({
         message: "Package created successfully.",
-        package_id: result.insertId, // Returns the ID of the newly created package
+        package_id: result.insertId, // The ID of the newly created package
+        imageUrl: imagePath,  // Image URL for confirmation
       });
     }
   );
 };
 
 
-// // Create Topic
-// exports.createTopic = (req, res, next) => {
-//   const { topic_name, video_url, course_id } = req.body;
 
-//   // Validation checks (optional)
-//   if (!topic_name || !video_url || !course_id) {
-//     return res.status(400).json({ message: "All fields are required" });
-//   }
+// Function to map selected courses to the package
+exports.mapCoursesToPackage = (req, res, next) => {
+  const { packageId, courses } = req.body;
 
-//   // Corrected query with quotes
-//   const query = "INSERT INTO topics (topic_name, video_url, course_id) VALUES (?, ?, ?)";
-  
-//   connection.query(query, [topic_name, video_url, course_id], (err, result) => {
-//     if (err) {
-//       console.error("Error creating topic:", err);
-//       return res.status(500).json({
-//         message: "An error occurred while creating the topic",
-//         error: err,
-//       });
-//     }
+  // Validation checks
+  if (!packageId || !courses || courses.length === 0) {
+    return res.status(400).json({ message: "Package ID and selected courses are required." });
+  }
 
-//     res.status(201).json({
-//       message: "Topic created successfully",
-//       topic_id: result.insertId, // Returns the ID of the newly created topic
-//     });
-//   });
-// };
-//  exports.getAllCourses = (req, res) => {
-//   const query = "SELECT * FROM course";
-  
-//   connection.query(query, (err, results) => {
-//     if (err) {
-//       console.error("Error fetching courses:", err);
-//       return res.status(500).json({ message: "Internal Server Error", error: err });
-//     }
- 
-//     res.status(200).json({ message: "Courses fetched successfully", courses: results });
-//   });
-// };
+  // Check if the package exists
+  const checkPackageQuery = `SELECT * FROM packages WHERE package_id = ?`;
+  connection.query(checkPackageQuery, [packageId], (err, result) => {
+    if (err) {
+      console.error("Error checking package:", err);
+      return res.status(500).json({
+        message: "An error occurred while checking the package.",
+        error: err,
+      });
+    }
 
-// exports.getTopicsByCourseId = (req, res) => {
-//   const { course_id } = req.params;
- 
-//   // Validate input
-//   if (!course_id) {
-//     return res.status(400).json({ message: "Course ID is required" });
-//   }
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Package not found." });
+    }
 
-//   const query = "SELECT * FROM topics WHERE course_id = ?";
-//   console.log("get topics");
-//   connection.query(query, [course_id], (err, results) => {
-//     if (err) {
-//       console.error("Error fetching topics:", err);
-//       return res.status(500).json({ message: "Internal Server Error", error: err });
-//     }
+    // Now check if all courses exist in the courses table
+    const checkCoursesQuery = `SELECT * FROM course WHERE course_id IN (?)`;
+    connection.query(checkCoursesQuery, [courses], (err, result) => {
+      if (err) {
+        console.error("Error checking courses:", err);
+        return res.status(500).json({
+          message: "An error occurred while checking the courses.",
+          error: err,
+        });
+      }
 
-//     res.status(200).json({ message: "Topics fetched successfully", topics: results });
-//   });
-// };
+      if (result.length !== courses.length) {
+        return res.status(404).json({ message: "One or more courses not found." });
+      }
 
-// exports.getCourseByCourseId = (req, res) => {
-//   const { course_id } = req.params;
+      // Now insert the courses into the package_courses table
+      const mapCoursesQuery = `
+        INSERT INTO package_courses (package_id, course_id)
+        VALUES ?
+      `;
 
-//   // Validate input
-//   if (!course_id) {
-//     return res.status(400).json({ message: "Course ID is required" });
-//   }
-  
-//   console.log("Fetching course details");
+      // Prepare the course values to be inserted
+      const courseValues = courses.map(courseId => [packageId, courseId]);
 
-//   const query = "SELECT * FROM course WHERE course_id = ?";
-  
-//   connection.query(query, [course_id], (err, results) => {
-//     if (err) {
-//       console.error("Error fetching course:", err);
-//       return res.status(500).json({ message: "Internal Server Error", error: err });
-//     }
+      connection.query(mapCoursesQuery, [courseValues], (err, result) => {
+        if (err) {
+          console.error("Error mapping courses:", err);
+          return res.status(500).json({
+            message: "An error occurred while mapping courses.",
+            error: err,
+          });
+        }
 
-//     if (results.length === 0) {
-//       return res.status(404).json({ message: "Course not found" });
-//     }
+        res.status(200).json({
+          message: "Courses successfully mapped to the package.",
+        });
+      });
+    });
+  });
+};
 
-//     // Extracting the course details
-//     const courseDetails = results[0]; // Assuming `course_id` is unique
-//     const { course_name, course_description, instructor } = courseDetails;
 
-//     res.status(200).json({
-//       message: "Course fetched successfully",
-//       course: {
-//         id: course_id,
-//         name: course_name,
-//         description: course_description,
-//         instructor: instructor,
-//       },
-//     });
-//   });
-// };
-// const updateCourseDetails = (req, res) => {
-//   const { courseid } = req.params;
-//   const { course_name, course_description, instructor } = req.body;
 
-//   // Validate input
-//   if (!courseid) {
-//     return res.status(400).json({ message: "Course ID is required" });
-//   }
 
-//   if (!course_name || !course_description || !instructor) {
-//     return res.status(400).json({ message: "All fields are required" });
-//   }
 
-//   console.log("Updating course details");
 
-//   const query = `
-//     UPDATE course 
-//     SET course_name = ?, course_description = ?, instructor = ? 
-//     WHERE course_id = ?
-//   `;
+// Function to get packages with their associated courses
+exports.getPackagesWithCourses = (req, res, next) => {
+  const { page = 1, limit = 10, searchTerm = "" } = req.query;
 
-//   connection.query(
-//     query,
-//     [course_name, course_description, instructor, courseid],
-//     (err, result) => {
-//       if (err) {
-//         console.error("Error updating course:", err);
-//         return res.status(500).json({ message: "Internal Server Error", error: err });
-//       }
+  // Calculate offset for pagination
+  const offset = (page - 1) * limit;
 
-//       if (result.affectedRows === 0) {
-//         return res.status(404).json({ message: "Course not found" });
-//       }
+  // SQL query with pagination and search term
+  const query = `
+    SELECT p.package_id, p.package_name, p.created_time, c.course_name 
+    FROM packages p
+    LEFT JOIN package_courses pc ON p.package_id = pc.package_id
+    LEFT JOIN course c ON pc.course_id = c.course_id
+    WHERE p.package_name LIKE ?
+    ORDER BY p.created_time DESC
+    LIMIT ? OFFSET ?
+  `;
 
-//       res.status(200).json({
-//         message: "Course updated successfully",
-//         updatedFields: { course_name, course_description, instructor },
-//       });
-//     }
-//   );
-// };
+  // Execute query with search term and pagination parameters
+  connection.query(query, [`%${searchTerm}%`, parseInt(limit), parseInt(offset)], (err, result) => {
+    if (err) {
+      console.error("Error fetching packages with courses:", err);
+      return res.status(500).json({
+        message: "An error occurred while fetching the packages.",
+        error: err,
+      });
+    }
 
-// const deleteTopicById = (req, res) => {
-//   const { topic_id } = req.params;
+    // Count total number of matching packages for pagination
+    const countQuery = `SELECT COUNT(*) AS total FROM packages WHERE package_name LIKE ?`;
+    connection.query(countQuery, [`%${searchTerm}%`], (err, countResult) => {
+      if (err) {
+        console.error("Error counting packages:", err);
+        return res.status(500).json({
+          message: "An error occurred while counting the packages.",
+          error: err,
+        });
+      }
 
-//   // Validate input
-//   if (!topic_id) {
-//     return res.status(400).json({ message: "Topic ID is required" });
-//   }
+      const totalPackages = countResult[0].total;
+      const totalPages = Math.ceil(totalPackages / limit);
 
-//   console.log("Deleting topic");
+      // Reduce the result to organize packages with their associated courses
+      const packagesWithCourses = result.reduce((acc, row) => {
+        const existingPackage = acc.find(pkg => pkg.package_id === row.package_id);
 
-//   const query = "DELETE FROM topics WHERE topic_id = ?";
+        if (existingPackage) {
+          // Ensure the 'courses' array is always initialized
+          if (!existingPackage.courses) {
+            existingPackage.courses = [];
+          }
+          existingPackage.courses.push(row.course_name);
+        } else {
+          acc.push({
+            package_id: row.package_id,
+            package_name: row.package_name,
+            created_time: row.created_time,
+            courses: [row.course_name], // Initialize courses array
+          });
+        }
+        return acc;
+      }, []);
 
-//   connection.query(query, [topic_id], (err, result) => {
-//     if (err) {
-//       console.error("Error deleting topic:", err);
-//       return res.status(500).json({ message: "Internal Server Error", error: err });
-//     }
+      res.status(200).json({
+        packages: packagesWithCourses,
+        totalPages: totalPages,
+      });
+    });
+  });
+};
 
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ message: "Topic not found" });
-//     }
 
-//     res.status(200).json({
-//       message: "Topic deleted successfully",
-//       deletedTopicId: topic_id,
-//     });
-//   });
-// };
 
-// // Export functions using module.exports
-// module.exports = {
-//   updateCourseDetails,
-//   deleteTopicById,
-// };
+
+
+
+// Function to get a single package with details and associated courses
+exports.getPackageById = (req, res, next) => {
+  const { packageId } = req.params;
+
+  if (!packageId) {
+    return res.status(400).json({ message: "Package ID is required." });
+  }
+
+  const packageQuery = `
+    SELECT p.package_id, p.package_name, p.package_price, p.description, p.created_time, 
+           c.course_id, c.course_name
+    FROM packages p
+    LEFT JOIN package_courses pc ON p.package_id = pc.package_id
+    LEFT JOIN course c ON pc.course_id = c.course_id
+    WHERE p.package_id = ?
+  `;
+
+  connection.query(packageQuery, [packageId], (err, results) => {
+    if (err) {
+      console.error("Error fetching package:", err);
+      return res.status(500).json({
+        message: "An error occurred while fetching the package details.",
+        error: err,
+      });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({ message: "Package not found." });
+    }
+
+    const packageDetails = results.reduce((acc, row) => {
+      if (!acc) {
+        acc = {
+          package_id: row.package_id,
+          package_name: row.package_name,
+          package_price: row.package_price,
+          description: row.description,
+          created_time: row.created_time,
+          courses: [],
+        };
+      }
+
+      if (row.course_id) {
+        acc.courses.push({
+          course_id: row.course_id,
+          course_name: row.course_name,
+        });
+      }
+
+      return acc;
+    }, null);
+
+    res.status(200).json(packageDetails);
+  });
+};
+
+exports.getAllCourses = (req, res, next) => {
+  const query = "SELECT course_id, course_name FROM course";
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching courses:", err);
+      return res.status(500).json({
+        message: "An error occurred while fetching the courses.",
+        error: err,
+      });
+    }
+
+    res.status(200).json(results); // Send back the list of courses
+  });
+};

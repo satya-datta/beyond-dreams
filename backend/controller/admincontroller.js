@@ -51,35 +51,60 @@ exports.authadmin = (req, res, next) => {
   );
 };
 // Create Course
+const multer = require("multer");
+const path = require("path");
+
+// Configure multer for file upload
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // Directory where images will be stored
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
+  },
+});
+
+const upload = multer({ storage });
+
+// Controller for creating a course
 exports.createCourse = (req, res, next) => {
-  const { course_name, created_time, course_description, instructor } = req.body;
+  upload.single("course_image")(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: "Image upload failed", error: err });
+    }
 
-  // Validation checks (optional)
-  if (!course_name || !created_time || !course_description || !instructor) {
-    return res.status(400).json({ message: "All fields are required" });
-  }
+    const { course_name, created_time, course_description, instructor } = req.body;
 
-  // Corrected query with quotes
-  const query = "INSERT INTO course (course_name, created_time, course_description, instructor) VALUES (?, ?, ?, ?)";
-  
-  connection.query(
-    query,
-    [course_name, created_time, course_description, instructor],
-    (err, result) => {
-      if (err) {
-        console.error("Error creating course:", err);
-        return res.status(500).json({
-          message: "An error occurred while creating the course",
-          error: err,
+    // Validation checks (optional)
+    if (!course_name || !created_time || !course_description || !instructor) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Get the image path (if provided)
+    const course_image = req.file ? req.file.filename : null;
+
+    // SQL query with course_image
+    const query = "INSERT INTO course (course_name, created_time, course_description, instructor, course_image) VALUES (?, ?, ?, ?, ?);";
+
+    connection.query(
+      query,
+      [course_name, created_time, course_description, instructor, course_image],
+      (err, result) => {
+        if (err) {
+          console.error("Error creating course:", err);
+          return res.status(500).json({
+            message: "An error occurred while creating the course",
+            error: err,
+          });
+        }
+
+        res.status(201).json({
+          message: "Course created successfully",
+          course_id: result.insertId, // Returns the ID of the newly created course
         });
       }
-
-      res.status(201).json({
-        message: "Course created successfully",
-        course_id: result.insertId, // Returns the ID of the newly created course
-      });
-    }
-  );
+    );
+  });
 };
 
 // Create Topic
@@ -141,6 +166,7 @@ exports.getTopicsByCourseId = (req, res) => {
     res.status(200).json({ message: "Topics fetched successfully", topics: results });
   });
 };
+
 exports.getCourseByCourseId = (req, res) => {
   const { course_id } = req.params;
 
