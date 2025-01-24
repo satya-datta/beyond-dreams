@@ -79,7 +79,7 @@ exports.createUser = (req, res, next) => {
       return res.status(500).json({ message: 'Error uploading avatar image', error: err });
     }
 
-    const { name, package_id, email, phone, gender, sponsorName, sponsorEmail, generatedReferralCode, referrerId, referrercode } = req.body;
+    const { name, package_id, email, phone, gender, Address, Pincode, generatedReferralCode, referrerId, referrercode } = req.body;
     const avatar = req.file ? req.file.filename : null; // Get the uploaded avatar filename
 
     // Validate the data
@@ -89,7 +89,7 @@ exports.createUser = (req, res, next) => {
 
     // Prepare SQL query to insert user data
     const userQuery = `
-      INSERT INTO user (Name, PackageId, Email, Phone, Gender, Avatar, SponsorName, SponsorEmail, GeneratedReferralCode, ReferrerId, reffercode)
+      INSERT INTO user (Name, PackageId, Email, Phone, Gender, Avatar, Address, Pincode, GeneratedReferralCode, ReferrerId, reffercode)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
@@ -100,8 +100,8 @@ exports.createUser = (req, res, next) => {
       phone,
       gender,
       avatar, // Storing the filename of the avatar
-      sponsorName || null,
-      sponsorEmail || null,
+      Address || null,
+      Pincode || null,
       generatedReferralCode || null,
       referrerId || null,
       referrercode || null,
@@ -238,8 +238,8 @@ exports.getUserById = (req, res) => {
       Phone AS phone,
       Gender AS gender,
       Avatar AS avatar,
-      SponsorName AS sponsorName,
-      SponsorEmail AS sponsorEmail,
+      Address AS Address,
+      Pincode AS Pincode,
       GeneratedReferralCode AS generatedReferralCode,
       ReferrerId AS referrerId,
       reffercode AS referralCode
@@ -269,12 +269,154 @@ exports.getUserById = (req, res) => {
         phone: userDetails.phone,
         gender: userDetails.gender,
         avatar: userDetails.avatar,
-        sponsorName: userDetails.sponsorName,
-        sponsorEmail: userDetails.sponsorEmail,
+        Address: userDetails.Address,
+        Pincode: userDetails.Pincode,
         generatedReferralCode: userDetails.generatedReferralCode,
         referrerId: userDetails.referrerId,
         referralCode: userDetails.referralCode,
       },
+    });
+  });
+};
+exports.updateUser = (req, res, next) => {
+  // Handle avatar upload
+  upload.single('avatar')(req, res, (err) => {
+    if (err) {
+      return res.status(500).json({ message: 'Error uploading avatar image', error: err });
+    }
+
+    const userId = req.params.user_id; // Extract user ID from route params
+    const {
+      name,
+      package_id,
+      email,
+      phone,
+      gender,
+      Address,
+      Pincode,
+      generatedReferralCode,
+      referrerId,
+      referrercode,
+    } = req.body;
+
+    const avatar = req.file ? req.file.filename : null; // Get the new avatar filename if provided
+
+    // Validate required fields
+    if (!userId || !name || !package_id || !email || !phone || !gender) {
+      return res.status(400).json({ message: 'All required fields must be provided' });
+    }
+
+    // Prepare query and data for updating user details
+    const updateUserQuery = `
+      UPDATE user
+      SET 
+        Name = ?, 
+        PackageId = ?, 
+        Email = ?, 
+        Phone = ?, 
+        Gender = ?, 
+        Avatar = COALESCE(?, Avatar), 
+        Address = ?, 
+        Pincode = ?, 
+        GeneratedReferralCode = ?, 
+        ReferrerId = ?, 
+        reffercode = ?
+      WHERE userid = ?
+    `;
+
+    const updateUserValues = [
+      name,
+      package_id,
+      email,
+      phone,
+      gender,
+      avatar,
+      Address || null,
+      Pincode || null,
+      generatedReferralCode || null,
+      referrerId || null,
+      referrercode || null,
+      userId,
+    ];
+
+    // Execute the update query
+    connection.query(updateUserQuery, updateUserValues, (err, result) => {
+      if (err) {
+        console.error('Error updating user details:', err);
+        return res.status(500).json({ message: 'Error updating user details', error: err });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Handle referral code logic if provided
+      if (referrercode) {
+        const referrerQuery = `
+          SELECT userid, PackageId FROM user WHERE GeneratedReferralCode = ?
+        `;
+
+        connection.query(referrerQuery, [referrercode], (err, referrerResult) => {
+          if (err) {
+            console.error('Error finding referrer:', err);
+            return res.status(500).json({ message: 'Error processing referral code', error: err });
+          }
+
+          if (referrerResult.length > 0) {
+            const referrerId = referrerResult[0].userid;
+            const referrerPackageId = referrerResult[0].PackageId;
+            console.log('Referrer Found:', referrerId, '-', referrerPackageId);
+
+            returnCommissionMethod(package_id, referrerPackageId, (err, referralCommission) => {
+              if (err) {
+                return res.status(500).json({ message: 'Error calculating referral commission', error: err });
+              }
+              console.log('Referral Commission:', referralCommission);
+
+              // Update referrer's wallet
+              const updateWalletQuery = `
+                UPDATE wallet SET balance = balance + ? WHERE user_id = ?
+              `;
+              connection.query(updateWalletQuery, [referralCommission, referrerId], (err) => {
+                if (err) {
+                  console.error('Error updating referrer wallet:', err);
+                  return res.status(500).json({ message: 'Error updating referrer wallet', error: err });
+                }
+
+                // Record wallet transaction
+                const transactionQuery = `
+                  INSERT INTO wallettransactions (user_id, wallet_id, amount, transaction_type, description)
+                  VALUES (?, (SELECT wallet_id FROM wallet WHERE user_id = ?), ?, ?, ?)
+                `;
+                const transactionValues = [
+                  referrerId,
+                  referrerId,
+                  referralCommission,
+                  'credit',
+                  `Referral commission for user ${userId}`,
+                ];
+
+                connection.query(transactionQuery, transactionValues, (err) => {
+                  if (err) {
+                    console.error('Error recording wallet transaction:', err);
+                    return res.status(500).json({ message: 'Error recording wallet transaction', error: err });
+                  }
+
+                  return res.status(200).json({
+                    message: 'User details updated successfully with referral bonus applied',
+                  });
+                });
+              });
+            });
+          } else {
+            return res.status(200).json({
+              message: 'User details updated successfully (no referrer found)',
+            });
+          }
+        });
+      } else {
+        res.status(200).json({ message: 'User details updated successfully' });
+      }
     });
   });
 };

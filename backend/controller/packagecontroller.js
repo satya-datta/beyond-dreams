@@ -1,42 +1,35 @@
 const connection = require("../backend");
 
-// controller/packageController.js
-const path = require('path');
-
-
-// Create Package with image upload
 exports.createPackage = (req, res, next) => {
   const { packageName, price, description } = req.body;
-  const imageFile = req.file;  // This contains the uploaded file information
 
   // Validation checks
-  if (!packageName || !price || !description || !imageFile) {
-    return res.status(400).json({ message: "All fields, including the image, are required." });
+  if (!packageName || !price || !description) {
+    return res.status(400).json({ message: "All fields are required." });
   }
 
-  // Store image path in the database
-  const imagePath = `/uploads/${imageFile.filename}`; // Path to the image file
-
-  // Insert query for the package table including image
+  // Insert query for the package table with created_time
   const query = `
-    INSERT INTO packages (package_name, package_price, description, image_path, created_time)
-    VALUES (?, ?, ?, ?, NOW())
+    INSERT INTO packages(package_name, package_price, description, created_time) 
+    VALUES (?, ?, ?, NOW())
   `;
 
-  // Execute query
+  // Execute the query
   connection.query(
     query,
-    [packageName, price, description, imagePath],  // Include the image path
+    [packageName, price, description],
     (err, result) => {
       if (err) {
         console.error("Error creating package:", err);
-        return res.status(500).json({ message: "An error occurred while creating the package.", error: err });
+        return res.status(500).json({
+          message: "An error occurred while creating the package.",
+          error: err,
+        });
       }
 
       res.status(201).json({
         message: "Package created successfully.",
-        package_id: result.insertId, // The ID of the newly created package
-        imageUrl: imagePath,  // Image URL for confirmation
+        package_id: result.insertId, // Returns the ID of the newly created package
       });
     }
   );

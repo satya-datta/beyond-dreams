@@ -1,13 +1,12 @@
 const connection = require("../backend");
-const jwt = require("jsonwebtoken");
-
-// Secret key for JWT signing (store this securely in your environment variables)
-const JWT_SECRET = "AUTHENTICATED";
+const jwt = require("jsonwebtoken"); // Make sure to install this package
+const cookieParser = require("cookie-parser"); // Ensure this middleware is used in your app
+const JWT_SECRET = "AUTHENTICATED"; // Store this securely in environment variables
 
 // Authenticate Admin
 exports.authadmin = (req, res, next) => {
   const { email, password } = req.body;
-  console.log("enter authentication");
+  console.log("Enter authentication");
 
   // Validate input
   if (!email || !password) {
@@ -26,7 +25,7 @@ exports.authadmin = (req, res, next) => {
 
       // If admin found
       if (results.length > 0) {
-        console.log("successful");
+        console.log("Successful");
         const admin = results[0];
 
         // Generate a JWT token
@@ -36,20 +35,51 @@ exports.authadmin = (req, res, next) => {
           { expiresIn: "2h" } // Token expiry
         );
 
-        // Send token and admin details in response
+        // Set the token as an HTTP-only cookie
+        res.cookie("adminToken", token, {
+          httpOnly: true, // Prevent access to the cookie via JavaScript
+          secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+          sameSite: "strict", // Prevent CSRF
+          maxAge: 2 * 60 * 60 * 1000, // 2 hours
+        });
+
+        // Send success response
         return res.status(200).json({
           message: "Authentication successful",
-          token,
           admin: { id: admin.id, email: admin.email, name: admin.name },
         });
       } else {
-        console.log("unsuccessful");
+        console.log("Unsuccessful");
         // If admin not found
         return res.status(401).json({ message: "Unknown admin" });
       }
     }
   );
 };
+exports.validateAdminCookie = (req, res) => {
+  const token = req.cookies.adminToken;
+
+  // Check if token exists
+  if (!token) {
+    return res.status(401).json({ message: "Unauthorized: No token provided" });
+  }
+
+  // Verify the token
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      console.error("Token verification failed:", err);
+      return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+
+    // If token verification is successful
+    console.log("Token verified successfully:", decoded);
+    return res.status(200).json({
+      message: "Token verified successfully",
+      admin: decoded, // { id, email }
+    });
+  });
+};
+
 // Create Course
 const multer = require("multer");
 const path = require("path");

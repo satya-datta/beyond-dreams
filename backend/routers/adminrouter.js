@@ -1,6 +1,13 @@
 const router=require("express").Router();
 const admincontroller=require("../controller/admincontroller")
 const connection = require("../backend");
+const jwt = require("jsonwebtoken");
+
+// Secret key for JWT signing (use environment variables)
+const JWT_SECRET = process.env.JWT_SECRET || "AUTHENTICATED";
+
+
+
 router.put('/updatecoursedetails/:course_id', (req, res) => {
     const { course_id } = req.params;
     const { course_name, course_description, instructor } = req.body;
@@ -72,6 +79,7 @@ router.delete('/delete-topic/:topic_id',(req, res) => {
     });
   });
 router.post("/authadmin",admincontroller.authadmin);
+router.get("/auth/validate",admincontroller.validateAdminCookie);
 router.post('/create-course', admincontroller.createCourse);
 router.get('/getallcourses', admincontroller.getAllCourses);
 router.get('/gettopics/:course_id', admincontroller.getTopicsByCourseId);
