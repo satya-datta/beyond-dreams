@@ -78,12 +78,55 @@ router.delete('/delete-topic/:topic_id',(req, res) => {
       });
     });
   });
-router.post("/authadmin",admincontroller.authadmin);
-router.get("/auth/validate",admincontroller.validateAdminCookie);
-router.post('/create-course', admincontroller.createCourse);
-router.get('/getallcourses', admincontroller.getAllCourses);
-router.get('/gettopics/:course_id', admincontroller.getTopicsByCourseId);
-router.get('/getspecific_course/:course_id', admincontroller.getCourseByCourseId);
+
+  // Middleware to protect routes
+  const authenticate = (req, res, next) => {
+    const token = req.cookies.adminToken;
+  
+    // Check if token exists
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized: No token provided" });
+    }
+  
+    // Verify the token
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        console.error("Token verification failed:", err);
+        return res.status(403).json({ message: "Forbidden: Invalid token" });
+      }
+  
+      // Attach admin details to the request object
+      req.admin = decoded; // Example: { id, email }
+      next(); // Proceed to the next middleware/route handler
+    });
+  };
+  
+  // Public routes (do not require authentication)
+  router.post("/authadmin", admincontroller.authadmin);
+  router.post("/logout", (req, res) => {
+    // Clear the adminToken cookie
+    res.clearCookie("adminToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+      sameSite: "strict",
+    });
+  
+    res.status(200).json({ message: "Logout successful" });
+  });
+  router.get("/auth/validate", admincontroller.validateAdminCookie);
+  
+  // Protected routes (require authentication)
+  // router.post("/create-course", authenticate, admincontroller.createCourse);
+  // router.get("/getallcourses", authenticate, admincontroller.getAllCourses);
+  // router.get("/gettopics/:course_id", authenticate, admincontroller.getTopicsByCourseId);
+  // router.get("/getspecific_course/:course_id", authenticate, admincontroller.getCourseByCourseId);
+  
+  router.post("/create-course", admincontroller.createCourse);
+  router.get("/getallcourses", admincontroller.getAllCourses);
+  router.get("/gettopics/:course_id", admincontroller.getTopicsByCourseId);
+  router.get("/getspecific_course/:course_id", admincontroller.getCourseByCourseId);
+  
+  
 router.delete('/delete-course/:course_id', (req, res) => {
   const { course_id } = req.params;
 

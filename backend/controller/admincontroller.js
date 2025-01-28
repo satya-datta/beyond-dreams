@@ -79,6 +79,16 @@ exports.validateAdminCookie = (req, res) => {
     });
   });
 };
+exports.LogoutAdmin = (req, res) => {
+  // Clear the adminToken cookie
+  res.clearCookie("adminToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // Use secure cookies in production
+    sameSite: "strict",
+  });
+
+  res.status(200).json({ message: "Logout successful" });
+};
 
 // Create Course
 const multer = require("multer");
@@ -106,7 +116,7 @@ exports.createCourse = (req, res, next) => {
     const { course_name, created_time, course_description, instructor } = req.body;
 
     // Validation checks (optional)
-    if (!course_name || !created_time || !course_description || !instructor) {
+    if (!course_name || !course_description || !instructor) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -114,11 +124,11 @@ exports.createCourse = (req, res, next) => {
     const course_image = req.file ? req.file.filename : null;
 
     // SQL query with course_image
-    const query = "INSERT INTO course (course_name, created_time, course_description, instructor, course_image) VALUES (?, ?, ?, ?, ?);";
+    const query = "INSERT INTO course (course_name, created_time, course_description, instructor, course_image) VALUES (?, NOW(), ?, ?, ?);";
 
     connection.query(
       query,
-      [course_name, created_time, course_description, instructor, course_image],
+      [course_name, course_description, instructor, course_image],
       (err, result) => {
         if (err) {
           console.error("Error creating course:", err);
