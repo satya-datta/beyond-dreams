@@ -91,6 +91,7 @@ React and Tailwind are two popular technologies that have taken the web developm
 - **Enhancement 03:** Make it functional [Multiselect Dropdown/Form Elements].
 - **Enhancement 04:** Make best value editable [Pricing Table One/Pricing Table].
 - **Enhancement 05:** Rearrange Folder structure.
+![satyadatta (1) (1) (1)](https://github.com/user-attachments/assets/1506ac99-d10c-4998-a5d8-d339fe7f3de5)
 
 ### Version 1.2.0 - [Apr 28, 2023]
 
